@@ -63,6 +63,7 @@ SVG_HEADER = string.Template("""<?xml version="1.0" encoding="UTF-8"?>
 
 def rm_to_svg(rm_path, svg_path):
     """Convert `rm_path` to SVG at `svg_path`."""
+    image_path = Path(rm_path).with_suffix("")
     with open(rm_path, "rb") as infile, open(svg_path, "wt") as outfile:
         tree = read_tree(infile)
         tree_to_svg(tree, outfile)
@@ -73,7 +74,7 @@ def read_template_svg(template_path: Path) -> str:
     return "\n".join(lines[2:-2])
 
 
-def tree_to_svg(tree: SceneTree, output, include_template: Path | None = None):
+def tree_to_svg(tree: SceneTree, output, include_template: Path | None = None, image_path: Path | None = None):
     """Convert Blocks to SVG."""
 
     # find the anchor pos for further use
@@ -102,7 +103,7 @@ def tree_to_svg(tree: SceneTree, output, include_template: Path | None = None):
     if tree.root_text is not None:
         draw_text(tree.root_text, output)
 
-    draw_group(tree.root, output, anchor_pos)
+    draw_group(tree.root, output, anchor_pos, image_path=image_path)
 
     # Closing page group
     output.write('\t</g>\n')
@@ -191,7 +192,7 @@ def get_bounding_box(item: si.Group,
     return x_min, x_max, y_min, y_max
 
 
-def draw_group(item: si.Group, output, anchor_pos):
+def draw_group(item: si.Group, output, anchor_pos, image_path: Path | None = None):
     anchor_x, anchor_y = get_anchor(item, anchor_pos)
     output.write(f'\t\t<g id="{item.node_id}" transform="translate({xx(anchor_x)}, {yy(anchor_y)})">\n')
     for child_id in item.children:
@@ -200,9 +201,11 @@ def draw_group(item: si.Group, output, anchor_pos):
         if _logger.root.level == logging.DEBUG:
             output.write(f'\t\t<!-- child {child_id} {type(child)} -->\n')
         if isinstance(child, si.Group):
-            draw_group(child, output, anchor_pos)
+            draw_group(child, output, anchor_pos, image_path=image_path)
         elif isinstance(child, si.Line):
             draw_stroke(child, output)
+        elif isinstance(child, si.Image):
+            draw_image(child, output, image_path=image_path)
     output.write(f'\t\t</g>\n')
 
 
