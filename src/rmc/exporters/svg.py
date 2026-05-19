@@ -7,6 +7,7 @@ https://github.com/chemag/maxio .
 import logging
 import string
 import typing as tp
+import base64
 from pathlib import Path
 
 from rmscene import CrdtId, SceneTree, read_tree
@@ -289,3 +290,18 @@ def draw_text(text: si.Text, output):
                 output.write(f'\t\t\t<!-- Text line char_id: {p.start_id} -->\n')
             output.write(f'\t\t\t<text x="{xx(xpos)}" y="{yy(ypos)}" class="{cls}">{str(p).strip()}</text>\n')
     output.write('\t\t</g>\n')
+
+
+def draw_image(image: si.Image, output, image_path: Path | None = None):
+    left = image.vertices[0]
+    top = image.vertices[1]
+    right = image.vertices[4]
+    bottom = image.vertices[9]
+
+    height = bottom - top
+    width = right - left
+
+    href = base64.b64encode((image_path / image.filename).read_bytes()).decode()
+    output.write(f'\t\t<g transform="translate({xx(left)}, {yy(top)})">\n\n')
+    output.write(f'\t\t<image height="{yy(height)}" width="{xx(width)}" href="data:image/png;base64,{href}"/>\n\n')
+    output.write(f'\t\t</g>')
