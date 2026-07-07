@@ -120,6 +120,7 @@ def tree_structure(item):
 
 
 def convert_rm(filename: Path, to, fout):
+    image_path = filename.with_suffix("")
     with open(filename, "rb") as f:
         if to == "blocks":
             pprint_blocks(f, fout)
@@ -138,11 +139,11 @@ def convert_rm(filename: Path, to, fout):
             tree_to_json(tree, fout)
         elif to == "svg":
             tree = read_tree(f)
-            tree_to_svg(tree, fout)
+            tree_to_svg(tree, fout, image_path=image_path)
         elif to == "pdf":
             buf = io.StringIO()
             tree = read_tree(f)
-            tree_to_svg(tree, buf)
+            tree_to_svg(tree, buf, image_path=image_path)
             buf.seek(0)
             svg_to_pdf(buf, fout)
         else:
