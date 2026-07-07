@@ -8,7 +8,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-rmscene = ">=0.8.0, <0.9.0"
+rmscene = {git = "https://github.com/zealofzebras/rmscene.git", rev = "3d34f16ab5a1174bd887720f582e318575bee998"}
 click = "^8.0"
 
 [tool.poetry.dev-dependencies]
