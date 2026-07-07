@@ -15,7 +15,7 @@ import logging
 
 
 @click.command
-@click.version_option()
+@click.version_option(package_name="rmc")
 @click.option('-v', '--verbose', count=True)
 @click.option("-f", "--from", "from_", metavar="FORMAT", help="Format to convert from (default: guess from filename)")
 @click.option("-t", "--to", metavar="FORMAT", help="Format to convert to (default: guess from filename)")
