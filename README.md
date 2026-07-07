@@ -27,9 +27,18 @@ The format is guessed based on the filename if not specified:
     
     $ rmc file.rm -o file.pdf
 
+Export the full structured content of a `.rm` file as JSON:
+
+    $ rmc -t json file.rm
+    $ rmc file.rm -o file.json
+
 Create a `.rm` file containing the text in `text.md`:
 
     $ rmc -t rm text.md -o text.rm
+
+Available formats: `rm`, `markdown`, `svg`, `pdf`, `json`, `blocks`, `blocks-data`.
+
+See [docs/json-export.md](docs/json-export.md) for the full JSON output structure and examples.
 
 ## SVG/PDF Conversion Status
 
