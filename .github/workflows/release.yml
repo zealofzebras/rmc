@@ -110,7 +110,7 @@ jobs:
 
   publish-to-pypi:
     name: Publish Python distribution to PyPI
-    if: startsWith(github.ref, 'refs/tags/')  # only publish to PyPI on tag pushes
+    if: false  # temporarily disabled; publish binaries on GitHub only
     needs:
     - build
     runs-on: ubuntu-latest
@@ -132,7 +132,7 @@ jobs:
   github-release:
     name: Sign Python distribution and upload to Github Release
     needs:
-    - publish-to-pypi
+    - build
     - build-binaries
     runs-on: ubuntu-latest
 
@@ -178,6 +178,7 @@ jobs:
 
   publish-to-testpypi:
     name: Publish Python distribution to TestPyPI
+    if: false  # temporarily disabled; publish binaries on GitHub only
     needs:
     - build
     - tests
