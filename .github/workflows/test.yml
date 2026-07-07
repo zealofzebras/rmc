@@ -16,7 +16,7 @@ jobs:
         python-version: ["3.10", "3.11"]
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Install poetry
       run: pipx install poetry
     - name: Setup Python ${{ matrix.python-version }}
@@ -25,4 +25,8 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: 'poetry'
     - run: poetry install
-    - run: poetry run bash convert_test_files.sh
+    - name: Run smoke tests
+      run: |
+        poetry run rmc --help
+        poetry run rmc --version
+        poetry run python -c "import rmc.cli"

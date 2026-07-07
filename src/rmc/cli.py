@@ -10,12 +10,13 @@ from rmscene import read_tree, read_blocks, write_blocks, simple_text_document
 from .exporters.svg import tree_to_svg
 from .exporters.pdf import svg_to_pdf
 from .exporters.markdown import print_text
+from .exporters.json_export import tree_to_json
 
 import logging
 
 
 @click.command
-@click.version_option()
+@click.version_option(package_name="rmc")
 @click.option('-v', '--verbose', count=True)
 @click.option("-f", "--from", "from_", metavar="FORMAT", help="Format to convert from (default: guess from filename)")
 @click.option("-t", "--to", metavar="FORMAT", help="Format to convert to (default: guess from filename)")
@@ -25,7 +26,7 @@ def cli(verbose, from_, to, output, input):
     """Convert to/from reMarkable v6 files.
 
     Available FORMATs are: `rm` (reMarkable file), `markdown`, `svg`, `pdf`,
-    `blocks`, `blocks-data`.
+    `json`, `blocks`, `blocks-data`.
 
     Formats `blocks` and `blocks-data` dump the internal structure of the `rm`
     file, with and without detailed data values respectively.
@@ -91,6 +92,8 @@ def guess_format(p: Path):
         return "pdf"
     elif p.suffix == ".md" or p.suffix == ".markdown":
         return "markdown"
+    elif p.suffix == ".json":
+        return "json"
     else:
         return "blocks"
 
@@ -131,6 +134,9 @@ def convert_rm(filename: Path, to, fout):
             pprint_tree(f, fout, data=False)
         elif to == "markdown":
             print_text(f, fout)
+        elif to == "json":
+            tree = read_tree(f)
+            tree_to_json(tree, fout)
         elif to == "svg":
             tree = read_tree(f)
             tree_to_svg(tree, fout, image_path=image_path)
