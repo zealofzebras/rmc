@@ -178,6 +178,58 @@ class TestLayerExport:
         assert isinstance(point["y"], (int, float))
 
 
+class TestHighlightExport:
+    """Verify export of GlyphRange items, i.e. PDF text highlights."""
+
+    def test_highlights_are_found(self):
+        result = export_json("Wikipedia_highlighted_p1.rm")
+        texts = [h["text"] for h in result["highlights"]]
+        assert texts[0] == "The reMarkable uses electronic paper"
+        assert len(texts) == 4
+
+    def test_highlight_keys(self):
+        result = export_json("Wikipedia_highlighted_p1.rm")
+        assert set(result["highlights"][0].keys()) == {
+            "text",
+            "start",
+            "length",
+            "color",
+            "color_rgba",
+            "rectangles",
+        }
+
+    def test_highlight_color_is_name(self):
+        result = export_json("Wikipedia_highlighted_p1.rm")
+        assert result["highlights"][0]["color"] == "YELLOW"
+
+    def test_highlight_start_and_length(self):
+        result = export_json("Wikipedia_highlighted_p1.rm")
+        highlight = result["highlights"][0]
+        assert highlight["start"] == 821
+        assert highlight["length"] == 36
+
+    def test_highlight_rectangles(self):
+        """Rectangles are what a consumer needs to place the highlight."""
+        result = export_json("Wikipedia_highlighted_p1.rm")
+        rectangles = result["highlights"][0]["rectangles"]
+        assert len(rectangles) == 1
+        rect = rectangles[0]
+        assert set(rect.keys()) == {"x", "y", "w", "h"}
+        assert rect["x"] == pytest.approx(-810.1125828475945)
+        assert rect["y"] == pytest.approx(663.8742596766097)
+        assert rect["w"] == pytest.approx(669.9534087714892)
+        assert rect["h"] == pytest.approx(56.30432956921868)
+
+    def test_highlights_are_json_serializable(self):
+        tree = read_rm("Wikipedia_highlighted_p1.rm")
+        buf = io.StringIO()
+        tree_to_json(tree, buf)
+        assert json.loads(buf.getvalue())["highlights"][0]["rectangles"]
+
+    def test_file_without_highlights(self):
+        assert export_json("abcd.strokes.rm")["highlights"] == []
+
+
 class TestJsonSerialization:
     """Verify that the output is valid JSON."""
 
