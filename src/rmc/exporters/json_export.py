@@ -183,11 +183,25 @@ def _collect_highlights(tree: SceneTree) -> list:
     highlights = []
     for item in tree.walk():
         if isinstance(item, si.GlyphRange):
-            highlights.append(
-                {
-                    "text": item.text,
-                    "start": item.start,
-                    "length": len(item.text),
-                }
-            )
+            highlights.append(_glyph_range_to_dict(item))
     return highlights
+
+
+def _glyph_range_to_dict(item: si.GlyphRange) -> dict:
+    color_rgba_raw = getattr(item, "color_rgba", None)
+    return {
+        "text": item.text,
+        # Absent since reMarkable 3.6; kept so a consumer can still tie the
+        # highlight back to a position in the PDF's text stream when it is there.
+        "start": item.start,
+        # The stored length, which is not always `len(text)` -- see
+        # `glyph_range_from_stream`.
+        "length": item.length,
+        "color": item.color.name,
+        "color_rgba": list(color_rgba_raw) if color_rgba_raw is not None else None,
+        "rectangles": [_rectangle_to_dict(r) for r in item.rectangles],
+    }
+
+
+def _rectangle_to_dict(rect: si.Rectangle) -> dict:
+    return {"x": rect.x, "y": rect.y, "w": rect.w, "h": rect.h}
