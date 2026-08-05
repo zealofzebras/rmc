@@ -31,7 +31,7 @@ class TestJsonStructure:
 
     def test_top_level_keys(self):
         result = export_json("abcd.strokes.rm")
-        assert set(result.keys()) == {"text", "layers", "highlights"}
+        assert set(result.keys()) == {"text", "layers", "highlights", "paper_size"}
 
     def test_text_is_list(self):
         result = export_json("abcd.strokes.rm")
@@ -230,6 +230,24 @@ class TestHighlightExport:
         assert export_json("abcd.strokes.rm")["highlights"] == []
 
 
+class TestPaperSizeExport:
+    """The canvas the coordinates are in, which differs between devices."""
+
+    def test_paper_size_is_reported(self):
+        # A reMarkable Paper Pro page: the canvas is not the 1404x1872 of a
+        # reMarkable 2, which is the whole reason this has to be read rather
+        # than assumed.
+        assert export_json("Highlighter.rm")["paper_size"] == [1620, 2160]
+
+    def test_absent_when_the_file_has_no_scene_info(self):
+        # Files written before the device stored a size have no SceneInfo at
+        # all, and a guess would be worse than saying nothing.
+        assert export_json("abcd.strokes.rm")["paper_size"] is None
+
+    def test_absent_when_scene_info_carries_no_size(self):
+        assert export_json("pen_size_test.strokes.rm")["paper_size"] is None
+
+
 class TestJsonSerialization:
     """Verify that the output is valid JSON."""
 
@@ -264,6 +282,7 @@ class TestJsonSerialization:
             assert "text" in parsed, f"{rm_file.name} missing 'text'"
             assert "layers" in parsed, f"{rm_file.name} missing 'layers'"
             assert "highlights" in parsed, f"{rm_file.name} missing 'highlights'"
+            assert "paper_size" in parsed, f"{rm_file.name} missing 'paper_size'"
 
     def test_text_and_strokes_file(self):
         result = export_json("text_and_strokes.rm")
