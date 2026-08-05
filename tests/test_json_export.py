@@ -31,7 +31,7 @@ class TestJsonStructure:
 
     def test_top_level_keys(self):
         result = export_json("abcd.strokes.rm")
-        assert set(result.keys()) == {"text", "layers", "highlights"}
+        assert set(result.keys()) == {"text", "layers", "highlights", "paper_size"}
 
     def test_text_is_list(self):
         result = export_json("abcd.strokes.rm")
@@ -178,6 +178,76 @@ class TestLayerExport:
         assert isinstance(point["y"], (int, float))
 
 
+class TestHighlightExport:
+    """Verify export of GlyphRange items, i.e. PDF text highlights."""
+
+    def test_highlights_are_found(self):
+        result = export_json("Wikipedia_highlighted_p1.rm")
+        texts = [h["text"] for h in result["highlights"]]
+        assert texts[0] == "The reMarkable uses electronic paper"
+        assert len(texts) == 4
+
+    def test_highlight_keys(self):
+        result = export_json("Wikipedia_highlighted_p1.rm")
+        assert set(result["highlights"][0].keys()) == {
+            "text",
+            "start",
+            "length",
+            "color",
+            "color_rgba",
+            "rectangles",
+        }
+
+    def test_highlight_color_is_name(self):
+        result = export_json("Wikipedia_highlighted_p1.rm")
+        assert result["highlights"][0]["color"] == "YELLOW"
+
+    def test_highlight_start_and_length(self):
+        result = export_json("Wikipedia_highlighted_p1.rm")
+        highlight = result["highlights"][0]
+        assert highlight["start"] == 821
+        assert highlight["length"] == 36
+
+    def test_highlight_rectangles(self):
+        """Rectangles are what a consumer needs to place the highlight."""
+        result = export_json("Wikipedia_highlighted_p1.rm")
+        rectangles = result["highlights"][0]["rectangles"]
+        assert len(rectangles) == 1
+        rect = rectangles[0]
+        assert set(rect.keys()) == {"x", "y", "w", "h"}
+        assert rect["x"] == pytest.approx(-810.1125828475945)
+        assert rect["y"] == pytest.approx(663.8742596766097)
+        assert rect["w"] == pytest.approx(669.9534087714892)
+        assert rect["h"] == pytest.approx(56.30432956921868)
+
+    def test_highlights_are_json_serializable(self):
+        tree = read_rm("Wikipedia_highlighted_p1.rm")
+        buf = io.StringIO()
+        tree_to_json(tree, buf)
+        assert json.loads(buf.getvalue())["highlights"][0]["rectangles"]
+
+    def test_file_without_highlights(self):
+        assert export_json("abcd.strokes.rm")["highlights"] == []
+
+
+class TestPaperSizeExport:
+    """The canvas the coordinates are in, which differs between devices."""
+
+    def test_paper_size_is_reported(self):
+        # A reMarkable Paper Pro page: the canvas is not the 1404x1872 of a
+        # reMarkable 2, which is the whole reason this has to be read rather
+        # than assumed.
+        assert export_json("Highlighter.rm")["paper_size"] == [1620, 2160]
+
+    def test_absent_when_the_file_has_no_scene_info(self):
+        # Files written before the device stored a size have no SceneInfo at
+        # all, and a guess would be worse than saying nothing.
+        assert export_json("abcd.strokes.rm")["paper_size"] is None
+
+    def test_absent_when_scene_info_carries_no_size(self):
+        assert export_json("pen_size_test.strokes.rm")["paper_size"] is None
+
+
 class TestJsonSerialization:
     """Verify that the output is valid JSON."""
 
@@ -212,6 +282,7 @@ class TestJsonSerialization:
             assert "text" in parsed, f"{rm_file.name} missing 'text'"
             assert "layers" in parsed, f"{rm_file.name} missing 'layers'"
             assert "highlights" in parsed, f"{rm_file.name} missing 'highlights'"
+            assert "paper_size" in parsed, f"{rm_file.name} missing 'paper_size'"
 
     def test_text_and_strokes_file(self):
         result = export_json("text_and_strokes.rm")

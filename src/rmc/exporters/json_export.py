@@ -60,17 +60,57 @@ def scene_to_dict(tree: SceneTree) -> dict:
             }
           ],
           "highlights": [
-            {"text": "highlighted text", "start": 5, "length": 16}
-          ]
+            {
+              "text": "highlighted text",
+              "start": 5,
+              "length": 16,
+              "color": "YELLOW",
+              "color_rgba": null,
+              "rectangles": [
+                {"x": -810.11, "y": 663.87, "w": 669.95, "h": 56.3}
+              ]
+            }
+          ],
+          "paper_size": [1404, 1872]
         }
+
+    `rectangles` are in the same screen-unit coordinate space as stroke points,
+    so a consumer can project highlights onto a page with the same transform it
+    already uses for handwriting.
+
+    `paper_size` is the size of that coordinate space -- the device's own
+    canvas, not the size of any PDF behind it. It is what tells a consumer how
+    many screen units wide a page is, which differs between devices, and it is
+    ``null`` for a file written before the device recorded it.
     """
     result: dict = {}
 
     result["text"] = _text_to_list(tree.root_text) if tree.root_text is not None else []
     result["layers"] = _group_to_layers(tree.root)
     result["highlights"] = _collect_highlights(tree)
+    result["paper_size"] = _paper_size(tree.scene_info)
 
     return result
+
+
+def _paper_size(scene_info) -> tp.Optional[list]:
+    """Return the canvas size as ``[width, height]``, or None if unrecorded.
+
+    Firmware 3.27 added two more precise spellings of the same value alongside
+    the original integer pair. The LWW one is preferred because it is the one
+    the device updates.
+    """
+    if scene_info is None:
+        return None
+    for size in (
+        getattr(scene_info, "paper_size_lww", None),
+        getattr(scene_info, "paper_size_raw", None),
+        scene_info.paper_size,
+    ):
+        value = getattr(size, "value", size)
+        if value is not None:
+            return list(value)
+    return None
 
 
 def _text_to_list(root_text: si.Text) -> list:
