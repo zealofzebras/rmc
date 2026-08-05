@@ -3,6 +3,7 @@
 import os
 import sys
 import io
+import json
 from pathlib import Path
 from contextlib import contextmanager
 import click
@@ -11,6 +12,7 @@ from .exporters.svg import tree_to_svg
 from .exporters.pdf import svg_to_pdf
 from .exporters.markdown import print_text
 from .exporters.json_export import tree_to_json
+from .importers.json_import import json_to_rm
 
 import logging
 
@@ -21,8 +23,14 @@ import logging
 @click.option("-f", "--from", "from_", metavar="FORMAT", help="Format to convert from (default: guess from filename)")
 @click.option("-t", "--to", metavar="FORMAT", help="Format to convert to (default: guess from filename)")
 @click.option("-o", "--output", type=click.Path(), help="Output filename (default: write to standard out)")
+@click.option(
+    "--base",
+    type=click.Path(exists=True),
+    help="Existing rm file to merge into, when converting `json` to `rm`. "
+         "Its contents are preserved and the new highlights are appended.",
+)
 @click.argument("input", nargs=-1, type=click.Path(exists=True))
-def cli(verbose, from_, to, output, input):
+def cli(verbose, from_, to, output, base, input):
     """Convert to/from reMarkable v6 files.
 
     Available FORMATs are: `rm` (reMarkable file), `markdown`, `svg`, `pdf`,
@@ -30,6 +38,10 @@ def cli(verbose, from_, to, output, input):
 
     Formats `blocks` and `blocks-data` dump the internal structure of the `rm`
     file, with and without detailed data values respectively.
+
+    Converting `json` to `rm` builds a page from the `highlights` entries of a
+    document previously exported with `-t json`; see `--base` to add them to an
+    existing page rather than a new one.
 
     """
 
@@ -63,6 +75,11 @@ def cli(verbose, from_, to, output, input):
         )
         with open_output(to, output) as fout:
             convert_text(text, fout)
+    elif from_ == "json":
+        if to != "rm":
+            raise click.UsageError("json can only be converted to rm, not %s" % to)
+        with open_output(to, output) as fout:
+            convert_json(input, fout, base)
     else:
         raise click.UsageError("source format %s not implemented yet" % from_)
 
@@ -185,6 +202,24 @@ def pprint_tree(f, fout, data=True) -> None:
 
 def convert_text(text, fout):
     write_blocks(fout, simple_text_document(text))
+
+
+def convert_json(input, fout, base=None):
+    """Build an rm file from one JSON document, read from `input` or stdin."""
+    if len(input) > 1:
+        raise click.UsageError(
+            "json to rm takes a single input file; a page is built from one document"
+        )
+    if input:
+        data = json.loads(Path(input[0]).read_text(encoding="utf-8"))
+    else:
+        data = json.loads(sys.stdin.read())
+
+    if base is None:
+        json_to_rm(data, fout)
+        return
+    with open(base, "rb") as base_file:
+        json_to_rm(data, fout, base=base_file)
 
 
 if __name__ == "__main__":
