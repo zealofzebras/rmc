@@ -159,6 +159,130 @@ class TestMergeOntoBase:
             blocks = json_to_blocks({"highlights": []}, base_blocks=list(read_blocks(base)))
         assert len([b for b in blocks if isinstance(b, SceneGlyphItemBlock)]) == 4
 
+    def test_removal_marks_the_item_deleted_rather_than_dropping_it(self):
+        """The page is a CRDT: an item that just vanishes can be reinstated."""
+        original = export_highlights(open(HIGHLIGHTED, "rb").read())
+        data = {"highlights": [], "remove_highlights": [{"text": original[0]["text"]}]}
+        with open(HIGHLIGHTED, "rb") as base:
+            blocks = json_to_blocks(data, base_blocks=list(read_blocks(base)))
+
+        glyphs = [b for b in blocks if isinstance(b, SceneGlyphItemBlock)]
+        assert len(glyphs) == 4, "the block itself must survive"
+        deleted = [b for b in glyphs if b.item.value is None]
+        assert len(deleted) == 1
+        assert deleted[0].item.deleted_length > 0
+
+    def test_removed_highlight_is_gone_from_the_rebuilt_page(self):
+        original = export_highlights(open(HIGHLIGHTED, "rb").read())
+        data = {"highlights": [], "remove_highlights": [{"text": original[0]["text"]}]}
+        remaining = export_highlights(build_rm(data, base_path=HIGHLIGHTED))
+        assert len(remaining) == 3
+        assert original[0]["text"] not in [h["text"] for h in remaining]
+
+    def test_removal_keeps_the_item_id_so_the_chain_survives(self):
+        original = export_highlights(open(HIGHLIGHTED, "rb").read())
+        before = [i.item_id for i in glyph_items(open(HIGHLIGHTED, "rb").read())]
+        data = {"highlights": [], "remove_highlights": [{"text": original[0]["text"]}]}
+        with open(HIGHLIGHTED, "rb") as base:
+            blocks = json_to_blocks(data, base_blocks=list(read_blocks(base)))
+        after = [
+            b.item.item_id for b in blocks if isinstance(b, SceneGlyphItemBlock)
+        ]
+        assert after == before
+
+    def test_removal_and_addition_in_one_pass(self):
+        original = export_highlights(open(HIGHLIGHTED, "rb").read())
+        data = dict(
+            ONE_HIGHLIGHT, remove_highlights=[{"text": original[0]["text"]}]
+        )
+        remaining = export_highlights(build_rm(data, base_path=HIGHLIGHTED))
+        texts = [h["text"] for h in remaining]
+        assert original[0]["text"] not in texts
+        assert "appended highlight" in texts
+
+    def test_unmatched_removal_changes_nothing(self):
+        data = {"highlights": [], "remove_highlights": [{"text": "never highlighted"}]}
+        assert len(export_highlights(build_rm(data, base_path=HIGHLIGHTED))) == 4
+
+    def test_removal_matches_across_collapsed_whitespace(self):
+        """A wrapped highlight is joined differently by the two sides."""
+        original = export_highlights(open(HIGHLIGHTED, "rb").read())
+        spaced = original[0]["text"].replace(" ", "  \n ")
+        data = {"highlights": [], "remove_highlights": [{"text": spaced}]}
+        assert len(export_highlights(build_rm(data, base_path=HIGHLIGHTED))) == 3
+
+    def test_rectangles_disambiguate_two_copies_of_one_sentence(self):
+        twice = {
+            "highlights": [
+                dict(ONE_HIGHLIGHT["highlights"][0], text="same"),
+                dict(
+                    ONE_HIGHLIGHT["highlights"][0],
+                    text="same",
+                    rectangles=[{"x": 100.0, "y": 100.0, "w": 50.0, "h": 20.0}],
+                ),
+            ]
+        }
+        page = build_rm(twice)
+        data = {
+            "highlights": [],
+            "remove_highlights": [
+                {"text": "same", "rectangles": [{"x": 100.0, "y": 100.0, "w": 5.0, "h": 5.0}]}
+            ],
+        }
+        with open("test-two-copies.rm", "wb") as f:
+            f.write(page)
+        try:
+            remaining = export_highlights(build_rm(data, base_path="test-two-copies.rm"))
+        finally:
+            Path("test-two-copies.rm").unlink()
+        assert len(remaining) == 1
+        assert remaining[0]["rectangles"][0]["x"] == -800.0
+
+    def test_one_removal_takes_one_copy(self):
+        data = {"highlights": [], "remove_highlights": [{"text": "same"}]}
+        page = build_rm(
+            {
+                "highlights": [
+                    dict(ONE_HIGHLIGHT["highlights"][0], text="same"),
+                    dict(ONE_HIGHLIGHT["highlights"][0], text="same"),
+                ]
+            }
+        )
+        with open("test-dupes.rm", "wb") as f:
+            f.write(page)
+        try:
+            remaining = export_highlights(build_rm(data, base_path="test-dupes.rm"))
+        finally:
+            Path("test-dupes.rm").unlink()
+        assert len(remaining) == 1
+
+    def test_result_counts_only_removals_that_matched(self):
+        original = export_highlights(open(HIGHLIGHTED, "rb").read())
+        data = {
+            "highlights": [],
+            "remove_highlights": [
+                {"text": original[0]["text"]},
+                {"text": "never highlighted"},
+            ],
+        }
+        out = io.BytesIO()
+        with open(HIGHLIGHTED, "rb") as base:
+            result = json_to_rm(data, out, base=base)
+        assert result.removals_requested == 2
+        assert result.removed == 1
+
+    def test_result_reports_nothing_removed_when_no_removals_asked(self):
+        out = io.BytesIO()
+        with open(HIGHLIGHTED, "rb") as base:
+            result = json_to_rm(ONE_HIGHLIGHT, out, base=base)
+        assert result.removals_requested == 0
+        assert result.removed == 0
+        assert result.added == 1
+
+    def test_removal_on_a_fresh_page_is_a_no_op(self):
+        data = dict(ONE_HIGHLIGHT, remove_highlights=[{"text": "appended highlight"}])
+        assert len(export_highlights(build_rm(data))) == 1
+
     def test_merges_onto_a_page_with_strokes(self):
         merged = build_rm(ONE_HIGHLIGHT, base_path=RM_DIR / "abcd.strokes.rm")
         assert export_highlights(merged)[0]["text"] == "appended highlight"

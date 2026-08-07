@@ -27,7 +27,8 @@ import logging
     "--base",
     type=click.Path(exists=True),
     help="Existing rm file to merge into, when converting `json` to `rm`. "
-         "Its contents are preserved and the new highlights are appended.",
+         "Its contents are preserved, the new highlights are appended, and any "
+         "`remove_highlights` entries are marked deleted on it.",
 )
 @click.argument("input", nargs=-1, type=click.Path(exists=True))
 def cli(verbose, from_, to, output, base, input):
@@ -41,7 +42,8 @@ def cli(verbose, from_, to, output, base, input):
 
     Converting `json` to `rm` builds a page from the `highlights` entries of a
     document previously exported with `-t json`; see `--base` to add them to an
-    existing page rather than a new one.
+    existing page rather than a new one. With `--base`, a `remove_highlights`
+    list marks matching highlights on that page deleted.
 
     """
 
@@ -216,10 +218,21 @@ def convert_json(input, fout, base=None):
         data = json.loads(sys.stdin.read())
 
     if base is None:
-        json_to_rm(data, fout)
-        return
-    with open(base, "rb") as base_file:
-        json_to_rm(data, fout, base=base_file)
+        result = json_to_rm(data, fout)
+    else:
+        with open(base, "rb") as base_file:
+            result = json_to_rm(data, fout, base=base_file)
+
+    if result.removals_requested:
+        # On stderr, so it cannot corrupt an rm file written to stdout. The
+        # caller needs the count because a removal naming a highlight that is
+        # not on the page matches nothing, and silently doing nothing is not the
+        # same as having removed it. Its absence also tells an older rmc apart
+        # from this one, which ignores `remove_highlights` entirely.
+        click.echo(
+            f"removed {result.removed} of {result.removals_requested} highlights",
+            err=True,
+        )
 
 
 if __name__ == "__main__":
