@@ -3,8 +3,6 @@
 name: Test
 
 on:
-  push:
-    branches: [ main, github_actions ]
   pull_request:
     branches: [ main ]
 
